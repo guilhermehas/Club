@@ -71,10 +71,16 @@ ChurchRosser = ∀ {a b} → a ⇝ b → a ↓ b
 
 private
   ltr : ChurchRosser → ∀ {a} → Confl a
-  ltr cr = {!!}
+  ltr cr Rab1 Rab2 = cr (zags Rab1 (singls Rab2) )
 
   rtl : (∀ {a} → Confl a) → ChurchRosser
-  rtl cf = {!!}
+  rtl cf nil = join nil nil
+  rtl cf (zig {b = c} Rac rcb) with rtl cf rcb
+  ... | join {b = d} R*cd R*bd = join (cons Rac R*cd) R*bd
+  rtl cf (zag {b = c} RCa rcb) with rtl cf rcb
+  ... | join {b = d} R*cd R*bd with cf (cons RCa nil) R*cd
+  ... | join {b = e} R*ae R*de = join R*ae (*-trans R*bd R*de)
+
 
 goal : ChurchRosser iff ∀ {a} → Confl a
 goal = ltr , rtl

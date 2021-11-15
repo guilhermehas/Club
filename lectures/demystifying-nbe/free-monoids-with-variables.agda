@@ -85,7 +85,7 @@ module Normalization (X : Set) where
 
   -- TODO: add to stdlib
   module _ where
-    open import Data.Sum using (inj₁; inj₂)
+    open SymClosure hiding (gfold)
     open import Relation.Binary using (Rel; IsEquivalence; _=[_]⇒_)
     open import Relation.Binary.Construct.Closure.ReflexiveTransitive using (ε; _◅_)
 
@@ -96,8 +96,8 @@ module Normalization (X : Set) where
             T =[ f ]⇒ P →
             EqClosure.EqClosure T =[ f ]⇒ P
     gfold P-equiv f g ε               = P-equiv .IsEquivalence.refl
-    gfold P-equiv f g ((inj₁ x) ◅ xs) = P-equiv .IsEquivalence.trans (g x)                              (gfold P-equiv f g xs)
-    gfold P-equiv f g ((inj₂ x) ◅ xs) = P-equiv .IsEquivalence.trans (P-equiv .IsEquivalence.sym (g x)) (gfold P-equiv f g xs)
+    gfold P-equiv f g ((fwd x) ◅ xs) = P-equiv .IsEquivalence.trans (g x)                              (gfold P-equiv f g xs)
+    gfold P-equiv f g ((bwd x) ◅ xs) = P-equiv .IsEquivalence.trans (P-equiv .IsEquivalence.sym (g x)) (gfold P-equiv f g xs)
 
   -- Types
   data Ty : Set where
@@ -394,10 +394,10 @@ module Normalization (X : Set) where
   module _ where
     private
       -- TODO: add to stdlib
-      open import Data.Sum using (inj₁)
+      open SymClosure hiding (return)
 
       return : (t⟶t' : t ⟶ t') → t ∼ t'
-      return t⟶t' = Star.return (inj₁ t⟶t')
+      return t⟶t' = Star.return (fwd t⟶t')
 
     unit-left∼ :
                      (t : Γ ⊢ ∗) →

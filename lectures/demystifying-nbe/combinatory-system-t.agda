@@ -18,7 +18,7 @@ open import Data.Product
 open import Relation.Nullary
   using (¬_)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_)
+  using (_≡_; cong₂; sym)
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
   renaming (_◅◅_ to trans)
@@ -260,8 +260,24 @@ trace t = R-reduces (fund t)
 -- 1. Prove soundness of (multi-step) reduction
 -----
 
---sound-red* : {t t' : Tm a} → t ⟶* t' → eval t ≡ eval t'
---sound-red* = {!!}
+sound-red : {t t' : Tm a} → t ⟶ t' → eval t ≡ eval t'
+sound-red redk = ≡-refl
+sound-red reds = ≡-refl
+sound-red rec0 = ≡-refl
+sound-red recs = ≡-refl
+sound-red (fun st) rewrite sound-red st = ≡-refl
+sound-red (arg st) rewrite sound-red st = ≡-refl
+
+sound-red* : {t t' : Tm a} → t ⟶* t' → eval t ≡ eval t'
+sound-red* refl = ≡-refl
+sound-red* (x ◅ st) rewrite sound-red x | sound-red* st = ≡-refl
+-- sound-red* refl = ≡-refl
+-- sound-red* (redk ◅ step) = sound-red* step
+-- sound-red* (reds ◅ step) rewrite sound-red* step = ≡-refl
+-- sound-red* (rec0 ◅ step) = sound-red* step
+-- sound-red* (recs ◅ step) rewrite sound-red* step = ≡-refl
+-- sound-red* (fun x ◅ step) rewrite sym (sound-red* step) = {!≡-refl!}
+-- sound-red* (arg x ◅ step) rewrite sound-red* step = {!!}
 
 -----
 -- 2. Show that `norm t` doesn't reduce further

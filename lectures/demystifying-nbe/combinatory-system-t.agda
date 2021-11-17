@@ -10,7 +10,9 @@
 -- For abstract of the talk see:
 --   https://github.com/InitialTypes/Club/wiki/Abstracts.2019.DemystifyingNbE
 
-open import Data.Bool using (true; false)
+open import Data.Unit using (⊤)
+open import Data.Empty using (⊥)
+open import Data.Bool using (Bool; true; false; _∧_; T)
 open import Data.Nat
   using (ℕ ; zero ; suc)
 open import Data.Product
@@ -278,11 +280,60 @@ sound-red* (x ◅ st) rewrite sound-red x | sound-red* st = ≡-refl
 -- 2. Show that `norm t` doesn't reduce further
 -----
 
+isSucc : Tm a → Set
+isSucc K = ⊥
+isSucc S = ⊥
+isSucc Zero = ⊥
+isSucc Succ = ⊤
+isSucc Rec = ⊥
+isSucc (_ ∙ _) = ⊥
+
+isNormal : Tm a → Set
+isNormal K = ⊤
+isNormal S = ⊤
+isNormal Zero = ⊤
+isNormal Succ = ⊤
+isNormal Rec = ⊤
+isNormal (K ∙ term) = isNormal term
+isNormal (S ∙ term) = isNormal term
+isNormal (Succ ∙ term) = isNormal term
+isNormal (Rec ∙ term) = isNormal term
+isNormal (K ∙ _ ∙ _) = ⊥
+isNormal (S ∙ term ∙ term') = isNormal term × isNormal term'
+isNormal (Rec ∙ term ∙ term') = isNormal term × isNormal term'
+isNormal (term ∙ term' ∙ term'' ∙ term''') = isSucc term × isSucc term' × isSucc term'' × isNormal term'''
+
 DoesntReduce : Tm a → Set
 DoesntReduce {a} t = {t' : Tm a} → ¬ (t ⟶ t')
 
-NotApplication : Tm a → Set
-NotApplication {a} t = ∀ {t'} {t'' : Tm a} → ¬ (t ≡ t' ∙ t'')
+normalDoesntReduce : (t : Tm a) (normal : isNormal t) → DoesntReduce t
+normalDoesntReduce (K ∙ t) normal (arg step) = normalDoesntReduce t normal step
+normalDoesntReduce (S ∙ t') normal (arg step) = normalDoesntReduce t' normal step
+normalDoesntReduce (Succ ∙ t') normal (arg step) = normalDoesntReduce t' normal step
+normalDoesntReduce (Rec ∙ t') normal (arg step) = normalDoesntReduce t' normal step
+normalDoesntReduce (S ∙ t' ∙ t'') normal (fun (arg step)) = normalDoesntReduce t' (π₁ normal) step
+normalDoesntReduce (S ∙ t' ∙ t'') normal (arg step) = normalDoesntReduce t'' (π₂ normal) step
+normalDoesntReduce (Rec ∙ t' ∙ t'') (u , u') (fun (arg step)) = normalDoesntReduce t' u step
+normalDoesntReduce (Rec ∙ t' ∙ t'') (u , u') (arg step) = normalDoesntReduce t'' u' step
+normalDoesntReduce (.(K ∙ _ ∙ _) ∙ t' ∙ t'' ∙ t''') normal (fun (fun (fun redk))) = π₁ normal
+normalDoesntReduce (.(S ∙ _ ∙ _ ∙ _) ∙ t' ∙ t'' ∙ t''') normal (fun (fun (fun reds))) = π₁ normal
+normalDoesntReduce (.(Rec ∙ _ ∙ _ ∙ Zero) ∙ t' ∙ t'' ∙ t''') normal (fun (fun (fun rec0))) = π₁ normal
+normalDoesntReduce (.(Rec ∙ _ ∙ _ ∙ (Succ ∙ _)) ∙ t' ∙ t'' ∙ t''') normal (fun (fun (fun recs))) = π₁ normal
+normalDoesntReduce (.(_ ∙ _) ∙ t' ∙ t'' ∙ t''') normal (fun (fun (fun (fun step)))) = π₁ normal
+normalDoesntReduce (.(_ ∙ _) ∙ t' ∙ t'' ∙ t''') normal (fun (fun (fun (arg step)))) = π₁ normal
+normalDoesntReduce (t ∙ .(K ∙ _ ∙ _) ∙ t'' ∙ t''') normal (fun (fun (arg redk))) = π₁ (π₂ normal)
+normalDoesntReduce (t ∙ .(S ∙ _ ∙ _ ∙ _) ∙ t'' ∙ t''') normal (fun (fun (arg reds))) = π₁ (π₂ normal)
+normalDoesntReduce (t ∙ .(Rec ∙ _ ∙ _ ∙ Zero) ∙ t'' ∙ t''') normal (fun (fun (arg rec0))) = π₁ (π₂ normal)
+normalDoesntReduce (t ∙ .(Rec ∙ _ ∙ _ ∙ (Succ ∙ _)) ∙ t'' ∙ t''') normal (fun (fun (arg recs))) = π₁ (π₂ normal)
+normalDoesntReduce (t ∙ .(_ ∙ _) ∙ t'' ∙ t''') normal (fun (fun (arg (fun step)))) = π₁ (π₂ normal)
+normalDoesntReduce (t ∙ .(_ ∙ _) ∙ t'' ∙ t''') normal (fun (fun (arg (arg step)))) = π₁ (π₂ normal)
+normalDoesntReduce (t ∙ t' ∙ .(K ∙ _ ∙ _) ∙ t''') normal (fun (arg redk)) = π₁ (π₂ (π₂ normal))
+normalDoesntReduce (t ∙ t' ∙ .(S ∙ _ ∙ _ ∙ _) ∙ t''') normal (fun (arg reds)) = π₁ (π₂ (π₂ normal))
+normalDoesntReduce (t ∙ t' ∙ .(Rec ∙ _ ∙ _ ∙ Zero) ∙ t''') normal (fun (arg rec0)) = π₁ (π₂ (π₂ normal))
+normalDoesntReduce (t ∙ t' ∙ .(Rec ∙ _ ∙ _ ∙ (Succ ∙ _)) ∙ t''') normal (fun (arg recs)) = π₁ (π₂ (π₂ normal))
+normalDoesntReduce (t ∙ t' ∙ .(_ ∙ _) ∙ t''') normal (fun (arg (fun step))) = π₁ (π₂ (π₂ normal))
+normalDoesntReduce (t ∙ t' ∙ .(_ ∙ _) ∙ t''') normal (fun (arg (arg step))) = π₁ (π₂ (π₂ normal))
+normalDoesntReduce (t ∙ t' ∙ t'' ∙ t''') normal (arg step) = normalDoesntReduce t''' (π₂ (π₂ (π₂ normal))) step
 
 eval-norm-norm : (t : Tm a) → eval (norm t) ≡ eval t
 eval-norm-norm K = ≡-refl
@@ -290,10 +341,7 @@ eval-norm-norm S = ≡-refl
 eval-norm-norm Zero = ≡-refl
 eval-norm-norm Succ = ≡-refl
 eval-norm-norm Rec = ≡-refl
-eval-norm-norm (t ∙ t') rewrite eval-norm-norm t | eval-norm-norm t' = {!cong eval ?!}
-
-nfNotApplication : (t : Tm a) → NotApplication (norm t)
-nfNotApplication (t ∙ t') eq = {!!}
+eval-norm-norm (t ∙ t') = {!cong eval ?!}
 
 nfDoesntReduce : (t : Tm a) → DoesntReduce (norm t)
 nfDoesntReduce t step = let w = sound-red step in {!!} 
@@ -306,7 +354,7 @@ WeakNorm : Tm a → Set
 WeakNorm t = ∃ λ t' → (t ⟶* t') × DoesntReduce t'
 
 weakNorm : ∀ (t : Tm a) → WeakNorm t
-weakNorm t = norm t , (trace _) , (nfDoesntReduce t)
+weakNorm t = norm t , trace _ , nfDoesntReduce t
 
 -----
 -- 4. Prove church-rosser property
@@ -367,8 +415,7 @@ converge?t : (t t' : Tm a) → norm t ≡ norm t' → Converge t t'
 converge?t t t' eq = (norm t) , trace t , subst (λ x → t' ⟶* x) (sym eq) (trace t')
 
 converge?f : (t t' : Tm a) → ¬ (norm t ≡ norm t') → ¬ (Converge t t')
-converge?f t t' ¬eq (u , st , st') with sound-red* st | sound-red* st'
-... | eq1 | eq2 = ¬eq (cong quot (≡-trans eq1 (sym eq2)))
+converge?f t t' ¬eq (u , st , st') = ¬eq (cong quot (≡-trans (sound-red* st) (sym (sound-red* st'))))
 
 converge? : (t t' : Tm a) → Dec (Converge t t')
 converge? t t' with norm t ≟ norm t'

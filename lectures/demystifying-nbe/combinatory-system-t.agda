@@ -10,6 +10,7 @@
 -- For abstract of the talk see:
 --   https://github.com/InitialTypes/Club/wiki/Abstracts.2019.DemystifyingNbE
 
+open import Data.Bool using (true; false)
 open import Data.Nat
   using (ℕ ; zero ; suc)
 open import Data.Product
@@ -18,7 +19,8 @@ open import Data.Product
 open import Relation.Nullary
   using (¬_)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; cong₂; sym)
+  using (_≡_; cong₂; sym; subst; cong)
+  renaming (trans to ≡-trans)
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
   renaming (_◅◅_ to trans)
@@ -271,13 +273,6 @@ sound-red (arg st) rewrite sound-red st = ≡-refl
 sound-red* : {t t' : Tm a} → t ⟶* t' → eval t ≡ eval t'
 sound-red* refl = ≡-refl
 sound-red* (x ◅ st) rewrite sound-red x | sound-red* st = ≡-refl
--- sound-red* refl = ≡-refl
--- sound-red* (redk ◅ step) = sound-red* step
--- sound-red* (reds ◅ step) rewrite sound-red* step = ≡-refl
--- sound-red* (rec0 ◅ step) = sound-red* step
--- sound-red* (recs ◅ step) rewrite sound-red* step = ≡-refl
--- sound-red* (fun x ◅ step) rewrite sym (sound-red* step) = {!≡-refl!}
--- sound-red* (arg x ◅ step) rewrite sound-red* step = {!!}
 
 -----
 -- 2. Show that `norm t` doesn't reduce further
@@ -286,8 +281,22 @@ sound-red* (x ◅ st) rewrite sound-red x | sound-red* st = ≡-refl
 DoesntReduce : Tm a → Set
 DoesntReduce {a} t = {t' : Tm a} → ¬ (t ⟶ t')
 
---nfDoesntReduce : (t : Tm a) → DoesntReduce (norm t)
---nfDoesntReduce t = {!!}
+NotApplication : Tm a → Set
+NotApplication {a} t = ∀ {t'} {t'' : Tm a} → ¬ (t ≡ t' ∙ t'')
+
+eval-norm-norm : (t : Tm a) → eval (norm t) ≡ eval t
+eval-norm-norm K = ≡-refl
+eval-norm-norm S = ≡-refl
+eval-norm-norm Zero = ≡-refl
+eval-norm-norm Succ = ≡-refl
+eval-norm-norm Rec = ≡-refl
+eval-norm-norm (t ∙ t') rewrite eval-norm-norm t | eval-norm-norm t' = {!cong eval ?!}
+
+nfNotApplication : (t : Tm a) → NotApplication (norm t)
+nfNotApplication (t ∙ t') eq = {!!}
+
+nfDoesntReduce : (t : Tm a) → DoesntReduce (norm t)
+nfDoesntReduce t step = let w = sound-red step in {!!} 
 
 -----
 -- 3. Prove weak normalization
@@ -296,8 +305,8 @@ DoesntReduce {a} t = {t' : Tm a} → ¬ (t ⟶ t')
 WeakNorm : Tm a → Set
 WeakNorm t = ∃ λ t' → (t ⟶* t') × DoesntReduce t'
 
---weakNorm : ∀ (t : Tm a) → WeakNorm t
---weakNorm t = {!!}
+weakNorm : ∀ (t : Tm a) → WeakNorm t
+weakNorm t = norm t , (trace _) , (nfDoesntReduce t)
 
 -----
 -- 4. Prove church-rosser property
@@ -306,17 +315,62 @@ WeakNorm t = ∃ λ t' → (t ⟶* t') × DoesntReduce t'
 Converge : (t t' : Tm a) → Set
 Converge t t' =  ∃ λ v → (t ⟶* v) × (t' ⟶* v)
 
---church-rosser : {t u u' : Tm a}
---  → t ⟶* u
---  → t ⟶* u'
---  → Converge u u'
-----church-rosser p q = {!!}
+church-rosser : {t u u' : Tm a}
+ → t ⟶* u
+ → t ⟶* u'
+ → Converge u u'
+π₁ (church-rosser {t = t} p q) = norm t
+π₁ (π₂ (church-rosser {t = t} p q)) rewrite sound-red* p = trace _
+π₂ (π₂ (church-rosser {t = t} p q)) rewrite sound-red* q = trace _
 
 -----
 -- 5. Prove decidability of convergence
 -----
 
---open import Relation.Nullary using (Dec ; yes ; no)
---
---converge? : (t t' : Tm a) → Dec (Converge t t')
---converge? t t' = {!!}
+open import Relation.Nullary using (Dec ; yes ; no; _because_; ofʸ; ofⁿ)
+
+_≟t_ : (a b : Ty) → Dec (a ≡ b)
+Nat ≟t Nat = yes ≡-refl
+Nat ≟t (b ⇒ b₁) = no (λ ())
+(a ⇒ a₁) ≟t Nat = no (λ ())
+(a ⇒ a₁) ≟t (b ⇒ b₁) with a ≟t b | a₁ ≟t b₁
+... | .true because ofʸ p | .true because ofʸ p₁ = yes (cong₂ _⇒_ p p₁)
+... | .true because ofʸ p | .false because ofⁿ ¬p = no λ { ≡-refl → ¬p ≡-refl}
+... | .false because ofⁿ ¬p | .true because ofʸ p = no λ{ ≡-refl → ¬p ≡-refl}
+... | .false because ofⁿ ¬p | .false because ofⁿ ¬p₁ = no λ{ ≡-refl → ¬p ≡-refl}
+
+_≟_ : (t t' : Tm a) → Dec (t ≡ t')
+K ≟ K = yes ≡-refl
+K ≟ (t' ∙ t'') = no (λ ())
+S ≟ S = yes ≡-refl
+S ≟ (t' ∙ t'') = no (λ ())
+Zero ≟ Zero = yes ≡-refl
+Zero ≟ (t' ∙ t'') = no (λ ())
+Succ ≟ Succ = yes ≡-refl
+Succ ≟ (t' ∙ t'') = no (λ ())
+Rec ≟ Rec = yes ≡-refl
+Rec ≟ (t' ∙ t'') = no (λ ())
+(t ∙ t₁) ≟ K = no (λ ())
+(t ∙ t₁) ≟ S = no (λ ())
+(t ∙ t₁) ≟ Zero = no (λ ())
+(t ∙ t₁) ≟ Succ = no (λ ())
+(t ∙ t₁) ≟ Rec = no (λ ())
+(_∙_ {a} t t') ≟ (_∙_ {a'} u u') with a ≟t a'
+... | _ because ofⁿ ¬p = no λ{ ≡-refl → ¬p ≡-refl}
+... | _ because ofʸ ≡-refl with t ≟ u | t' ≟ u'
+... | _ because ofʸ ≡-refl | _ because ofʸ ≡-refl = yes ≡-refl
+... | _ because ofʸ _  | _ because ofⁿ ¬p = no λ{ ≡-refl → ¬p ≡-refl}
+... | _ because ofⁿ ¬p | _ because ofʸ _  = no λ{ ≡-refl → ¬p ≡-refl}
+... | _ because ofⁿ ¬p | _ because ofⁿ _  = no λ{ ≡-refl → ¬p ≡-refl}
+
+converge?t : (t t' : Tm a) → norm t ≡ norm t' → Converge t t'
+converge?t t t' eq = (norm t) , trace t , subst (λ x → t' ⟶* x) (sym eq) (trace t')
+
+converge?f : (t t' : Tm a) → ¬ (norm t ≡ norm t') → ¬ (Converge t t')
+converge?f t t' ¬eq (u , st , st') with sound-red* st | sound-red* st'
+... | eq1 | eq2 = ¬eq (cong quot (≡-trans eq1 (sym eq2)))
+
+converge? : (t t' : Tm a) → Dec (Converge t t')
+converge? t t' with norm t ≟ norm t'
+... | _ because ofʸ p = yes (converge?t _ _ p)
+... | _ because ofⁿ ¬p = no (converge?f _ _ ¬p)

@@ -344,7 +344,7 @@ Normal a = Σ[ t ∈ Tm a ] isNormal t
 
 quot' : ⟦ a ⟧t → Normal a
 quot' {Nat} zero = Zero , tt
-quot' {Nat} (suc x) = (Succ ∙ π₁ (quot' x)) , (π₂ (quot' x))
+quot' {Nat} (suc x) = Succ ∙ π₁ (quot' x) , π₂ (quot' x)
 quot' {a ⇒ b} (t , _) = t
 
 quot't : ⟦ a ⟧t → Tm a
@@ -357,28 +357,30 @@ _∘'_ : ⟦ a ⇒ b ⟧t → ⟦ a ⟧t → ⟦ b ⟧t
 _∘'_ (_ , f) x = f x
 
 eval' : Tm a → ⟦ a ⟧t
-eval' K = (K , tt) , (λ x → ((K ∙ π₁ (quot' x)) , (π₂ (quot' x))) , (λ _ → x))
+eval' K = (K , tt) , (λ x → ((K ∙ quot't x) , quot'n x) , (λ _ → x))
 eval' S = (S , tt) , (λ g
   → (S ∙ quot't g , π₂ (π₁ g)) , λ f
-    → ((S ∙ quot't g ∙ quot't f) , (π₂ (π₁ g)) , (π₂ (π₁ f))) , λ x
+    → (S ∙ quot't g ∙ quot't f , (π₂ (π₁ g)) , (π₂ (π₁ f))) , λ x
       → (g ∘' x) ∘' (f ∘' x))
 eval' Zero = zero
 eval' Succ = (Succ , tt) , suc
 eval' (Rec {a}) = (Rec , tt) , (λ b
   → (Rec ∙ quot't b , quot'n  b) , λ f
-    → (Rec ∙ quot't b ∙ quot't f , (quot'n b) , (quot'n f))
+    → (Rec ∙ quot't b ∙ quot't f , quot'n b , quot'n f)
       , λ z → π₂ (π₂ f z) b)
-eval' (t ∙ u) with eval' t | eval' u
-... | (f , nf) , f' | g = f' g
+eval' (t ∙ u) = eval' t ∘' eval' u
 
-norm' : Tm a → Normal a
-norm' t = quot' (eval' t)
+normNormal : Tm a → Normal a
+normNormal t = quot' (eval' t)
 
-nfDoesntReduce' : (t : Tm a) → DoesntReduce (π₁ (norm' t))
-nfDoesntReduce' t with (t' , isNormal) ← norm' t = normalDoesntReduce t' isNormal
+norm' : Tm a → Tm a
+norm' t = quot't (eval' t)
+
+nfDoesntReduce' : (t : Tm a) → DoesntReduce (norm' t)
+nfDoesntReduce' t with (t' , isNormal) ← normNormal t = normalDoesntReduce t' isNormal
 
 nfDoesntReduce : (t : Tm a) → DoesntReduce (norm t)
-nfDoesntReduce t step = let w = sound-red step in {!!} 
+nfDoesntReduce t step = let w = sound-red step in {!!}
 
 -----
 -- 3. Prove weak normalization

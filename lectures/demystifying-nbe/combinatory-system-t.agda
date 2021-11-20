@@ -353,8 +353,14 @@ quot't x = π₁ (quot' x)
 quot'n : (t : ⟦ a ⟧t) → isNormal (π₁ (quot' t))
 quot'n x = π₂ (quot' x)
 
+infixl 5 _∘'_
+
 _∘'_ : ⟦ a ⇒ b ⟧t → ⟦ a ⟧t → ⟦ b ⟧t
 _∘'_ (_ , f) x = f x
+
+rec'' : ⟦ a ⟧t → ⟦ Nat ⇒ a ⇒ a ⟧t → ⟦ Nat ⟧t → ⟦ a ⟧t
+rec'' b f zero = b
+rec'' b f (suc n) = f ∘' n ∘' (rec'' b f n)
 
 eval' : Tm a → ⟦ a ⟧t
 eval' K = (K , tt) , (λ x → ((K ∙ quot't x) , quot'n x) , (λ _ → x))
@@ -367,7 +373,7 @@ eval' Succ = (Succ , tt) , suc
 eval' (Rec {a}) = (Rec , tt) , (λ b
   → (Rec ∙ quot't b , quot'n  b) , λ f
     → (Rec ∙ quot't b ∙ quot't f , quot'n b , quot'n f)
-      , λ z → π₂ (π₂ f z) b)
+      , rec'' b f)
 eval' (t ∙ u) = eval' t ∘' eval' u
 
 normNormal : Tm a → Normal a

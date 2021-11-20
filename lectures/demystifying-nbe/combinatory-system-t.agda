@@ -10,13 +10,13 @@
 -- For abstract of the talk see:
 --   https://github.com/InitialTypes/Club/wiki/Abstracts.2019.DemystifyingNbE
 
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥)
 open import Data.Bool using (Bool; true; false; _∧_; T)
 open import Data.Nat
   using (ℕ ; zero ; suc)
 open import Data.Product
-  using (∃ ; _×_ ; _,_)
+  -- using (∃ ; _×_ ; _,_)
   renaming (proj₁ to π₁ ; proj₂ to π₂)
 open import Relation.Nullary
   using (¬_)
@@ -335,13 +335,47 @@ normalDoesntReduce (t ∙ t' ∙ .(_ ∙ _) ∙ t''') normal (fun (arg (fun step
 normalDoesntReduce (t ∙ t' ∙ .(_ ∙ _) ∙ t''') normal (fun (arg (arg step))) = π₁ (π₂ (π₂ normal))
 normalDoesntReduce (t ∙ t' ∙ t'' ∙ t''') normal (arg step) = normalDoesntReduce t''' (π₂ (π₂ (π₂ normal))) step
 
-eval-norm-norm : (t : Tm a) → eval (norm t) ≡ eval t
-eval-norm-norm K = ≡-refl
-eval-norm-norm S = ≡-refl
-eval-norm-norm Zero = ≡-refl
-eval-norm-norm Succ = ≡-refl
-eval-norm-norm Rec = ≡-refl
-eval-norm-norm (t ∙ t') = {!cong eval ?!}
+Normal : (a : Ty) → Set
+Normal a = Σ[ t ∈ Tm a ] isNormal t
+
+⟦_⟧t : (a : Ty) → Set
+⟦ Nat ⟧t = ℕ
+⟦ x ⇒ y ⟧t = Normal (x ⇒ y) × (⟦ x ⟧t → ⟦ y ⟧t)
+
+quot' : ⟦ a ⟧t → Normal a
+quot' {Nat} zero = Zero , tt
+quot' {Nat} (suc x) = (Succ ∙ π₁ (quot' x)) , (π₂ (quot' x))
+quot' {a ⇒ b} (t , _) = t
+
+quot't : ⟦ a ⟧t → Tm a
+quot't x = π₁ (quot' x)
+
+quot'n : (t : ⟦ a ⟧t) → isNormal (π₁ (quot' t))
+quot'n x = π₂ (quot' x)
+
+_∘'_ : ⟦ a ⇒ b ⟧t → ⟦ a ⟧t → ⟦ b ⟧t
+_∘'_ (_ , f) x = f x
+
+eval' : Tm a → ⟦ a ⟧t
+eval' K = (K , tt) , (λ x → ((K ∙ π₁ (quot' x)) , (π₂ (quot' x))) , (λ _ → x))
+eval' S = (S , tt) , (λ g
+  → (S ∙ quot't g , π₂ (π₁ g)) , λ f
+    → ((S ∙ quot't g ∙ quot't f) , (π₂ (π₁ g)) , (π₂ (π₁ f))) , λ x
+      → (g ∘' x) ∘' (f ∘' x))
+eval' Zero = zero
+eval' Succ = (Succ , tt) , suc
+eval' (Rec {a}) = (Rec , tt) , (λ b
+  → (Rec ∙ quot't b , quot'n  b) , λ f
+    → (Rec ∙ quot't b ∙ quot't f , (quot'n b) , (quot'n f))
+      , λ z → π₂ (π₂ f z) b)
+eval' (t ∙ u) with eval' t | eval' u
+... | (f , nf) , f' | g = f' g
+
+norm' : Tm a → Normal a
+norm' t = quot' (eval' t)
+
+nfDoesntReduce' : (t : Tm a) → DoesntReduce (π₁ (norm' t))
+nfDoesntReduce' t with (t' , isNormal) ← norm' t = normalDoesntReduce t' isNormal
 
 nfDoesntReduce : (t : Tm a) → DoesntReduce (norm t)
 nfDoesntReduce t step = let w = sound-red step in {!!} 

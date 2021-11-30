@@ -11,6 +11,7 @@ open import Data.Nat.Base                         using (ℕ; zero; suc)
 open import Data.Nat.GeneralisedArithmetic        using (fold)
 
 open import Data.Product                          using (∃; _×_; _,_; proj₁; proj₂)
+open import Data.Sum                              using (_⊎_; inj₁; inj₂)
 open import Data.Unit.Polymorphic                 using (⊤)
 
 open import Relation.Binary                       using (REL)
@@ -65,6 +66,8 @@ data Ty : (Δ : KCxt) (k : Level) → Set where
   _⇒_  : (A : Ty Δ k) (B : Ty Δ l)       → Ty Δ (k ⊔ l)
   ∀̇    : (A : Ty (k ∷ Δ) l)              → Ty Δ (lsuc k ⊔ l)
   _[_] : (A : Ty (k ∷ Δ) l) (B : Ty Δ k) → Ty Δ l
+
+infixr 20 _⇒_
 
 variable
   A A' B B' : Ty Δ k
@@ -279,8 +282,21 @@ module Numeral (X : Set) (s : X → X) (z : X) (t : Tm [] TNat) where
   thm = ⦅ t ⦆R _ _ R ⦅s⦆ ⦅z⦆
   -- thm = ⦅ t ⦆R _ _ R {a' = s} (⦅s⦆ {x₂ = z}) {a' = z} ⦅z⦆
 
+TBool : Ty [] l1
+TBool = ∀̇ (var ⇒ var ⇒ var)
 
+module Booleans (B : Set) (false : B) (true : B) (t : Tm [] TBool) where
+  R : REL B (⊤ {ℓ = lzero}) lzero
+  R x _ = x ≡ false ⊎ x ≡ true
 
+  ⦅f⦆ : R false _
+  ⦅f⦆ = inj₁ refl
+
+  ⦅t⦆ : R true _
+  ⦅t⦆ = inj₂ refl
+
+  thm : ⦅ t ⦆ _ _ B false true ≡ false ⊎ ⦅ t ⦆ _ _ B false true ≡ true
+  thm = ⦅ t ⦆R _ _ R ⦅f⦆ ⦅t⦆
 
 -- Needs impredicativity:
 --

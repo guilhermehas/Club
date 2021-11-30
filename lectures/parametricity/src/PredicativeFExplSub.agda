@@ -104,6 +104,7 @@ mutual
     _⇒_  : (A : Ty Δ k) (B : Ty Δ l)   → Ty Δ (k ⊔ l)
     ∀̇    : (A : Ty (k ∷ Δ) l)          → Ty Δ (lsuc k ⊔ l)
     _[_] : (A : Ty Δ l) (τ : Sub Δ' Δ) → Ty Δ' l
+    _×'_ : (A : Ty Δ k) (B : Ty Δ l)   → Ty Δ (k ⊔ l)
 
   -- (Parallel) substitutions.
   -- `τ : Sub Δ Δ'` provides a type `Ty Δ k` for each `k ∈ Δ'`.
@@ -168,6 +169,7 @@ mutual
   ⟦ A ⇒ B   ⟧ ξ = ⟦ A ⟧ ξ → ⟦ B ⟧ ξ
   ⟦ ∀̇ A     ⟧ ξ = ∀ S → ⟦ A ⟧ (S , ξ)
   ⟦ A [ τ ] ⟧   = ⟦ A ⟧ ∘ ⟦ τ ⟧S
+  ⟦ A ×' B  ⟧ ξ = ⟦ A ⟧ ξ × ⟦ B ⟧ ξ
 
   ⟦_⟧S : (τ : Sub Δ Δ') → ⟪ Δ ⟫ → ⟪ Δ' ⟫
   ⟦ idS        ⟧S = id
@@ -203,6 +205,7 @@ mutual
   E⟦_⟧ : (A : Ty Δ k) (ξ : E⟪ Δ ⟫) → Setoid k k
   E⟦ var     ⟧   = proj₁
   E⟦ A ⇒ B   ⟧ ξ = E⟦ A ⟧ ξ ⇨ E⟦ B ⟧ ξ
+  E⟦ A ×' B  ⟧ ξ = {!E⟦ A ⟧ ξ ⇨ E⟦ B ⟧ ξ!}
   E⟦ ∀̇ A     ⟧ ξ = Π λ (S : Setoid _ _) → E⟦ A ⟧ (S , ξ)
   E⟦ A [ τ ] ⟧   = E⟦ A ⟧ ∘ E⟦ τ ⟧S
 
@@ -375,6 +378,9 @@ data Tm : ∀ {Δ : KCxt} (Γ : Cxt Δ) {k} → Ty Δ k → Set where
   var   : (x : A ∈G Γ)                          → Tm Γ A
   abs   : (t : Tm (A ∷ Γ) B)                    → Tm Γ (A ⇒ B)
   app   : (t : Tm Γ (A ⇒ B)) (u : Tm Γ A)       → Tm Γ B
+  prod  : (a : Tm Γ A) (b : Tm Γ B)             → Tm Γ (A ×' B)
+  proj1 : (ab : Tm Γ (A ×' B))                  → Tm Γ A
+  proj2 : (ab : Tm Γ (A ×' B))                  → Tm Γ B
 
   -- Generalization:
   -- ΛX:★ₙ.t : ∀X:★ₙ.A  when t : A
@@ -404,6 +410,9 @@ data Tm : ∀ {Δ : KCxt} (Γ : Cxt Δ) {k} → Ty Δ k → Set where
 ⦅ var x     ⦆       = ⦅ x ⦆x
 ⦅ abs t     ⦆ ξ η a = ⦅ t ⦆  ξ (a , η)
 ⦅ app t u   ⦆ ξ η   = ⦅ t ⦆  ξ       η (⦅ u ⦆ ξ η)
+⦅ prod a b  ⦆ ξ η   = ⦅ a ⦆ ξ η , ⦅ b ⦆ ξ η
+⦅ proj1 ab  ⦆ ξ η   = proj₁ (⦅ ab ⦆ ξ η)
+⦅ proj2 ab  ⦆ ξ η   = proj₂ (⦅ ab ⦆ ξ η)
 ⦅ gen t     ⦆ ξ η S = ⦅ t ⦆  (S , ξ) η
 ⦅ inst t B  ⦆ ξ η   = ⦅ t ⦆  ξ       η (⟦ B ⟧ ξ)
 ⦅ conv s t  ⦆ ξ     = ⦅ s ⦆S ξ ∘ ⦅ t ⦆ ξ
@@ -435,6 +444,7 @@ mutual
 
   -- ⟦★ₖ⟧ S S' = REL S S' k
 
+  ⟦ A ×' B  ⟧R ρ (a , b) (a' , b')  = ⟦ A ⟧R ρ a a' × ⟦ B ⟧R ρ b b'
   ⟦ ∀̇ A     ⟧R ρ f f'  = ∀ {S S'} (R : REL S S' _)
                        → ⟦ A ⟧R (R , ρ) (f S) (f' S')
 
@@ -526,6 +536,9 @@ mutual
 ⦅ var x     ⦆R        = ⦅ x ⦆xR
 ⦅ abs t     ⦆R ρ rs r = ⦅ t ⦆R ρ (r , rs)
 ⦅ app t u   ⦆R ρ rs   = ⦅ t ⦆R ρ       rs (⦅ u ⦆R ρ rs)
+⦅ prod a b  ⦆R ρ rs   = ⦅ a ⦆R ρ rs , ⦅ b ⦆R ρ rs
+⦅ proj1 ab  ⦆R ρ rs   = proj₁ (⦅ ab ⦆R ρ rs)
+⦅ proj2 ab  ⦆R ρ rs   = proj₂ (⦅ ab ⦆R ρ rs)
 ⦅ gen t     ⦆R ρ rs R = ⦅ t ⦆R (R , ρ) rs
 ⦅ inst t B  ⦆R ρ rs   = ⦅ t ⦆R ρ       rs (⟦ B ⟧R ρ)
 ⦅ conv s t  ⦆R ρ      = ⦅ s ⦆SR ρ ∘ ⦅ t ⦆R ρ
@@ -554,6 +567,7 @@ mutual
   idExt (A ⇒ B) r rewrite idExt⁻ A r = idExt B
   idExt (∀̇ A) R = {!!}  -- DOES NOT SEEM TO HOLD because heterogeneous!?
   idExt (A [ τ ]) = {!idExt A!}
+  idExt (A ×' B) = {!!}
 
   idExt⁻ : (A : Ty Δ l) {ξ : ⟪ Δ ⟫} → ∀{a a'} → ⟦ A ⟧R (IdR _ ξ) a a' → a ≡ a'
   idExt⁻ var = id
@@ -562,6 +576,7 @@ mutual
     where postulate
       funExt : Extensionality _ _
 
+  idExt⁻ (A ×' B) F = {!!}
   idExt⁻ (∀̇ A) F = funExt λ S → idExt⁻ A (F _≡_)
     where postulate
       funExt : Extensionality _ _
@@ -730,10 +745,76 @@ module Wrap
     R' a b = R (k a) b
 
 
+module Peirce2 where
+
+  P : Ty (lzero ∷ lzero ∷ []) lzero
+  P = let A = var; B = Wk var in
+      (A ⇒ B) ⇒ A
+
+  thm : (t : Tm [] P) → ⊥
+  thm t =
+    let
+      A  = ⊥
+      B  = ⊤₀
+      ξ  = A , B , _
+      ⦅t⦆ = ⦅ t ⦆ ξ _
+
+      RA : REL A ⊤₀ lzero
+      RA _ _ = ⊥
+
+      RB : REL B ⊤₀ lzero
+      RB _ _ = ⊤
+
+      ρ = RA , RB , _
+    in
+      ⦅ t ⦆R ρ _ λ ()
+
 -- More exercises:
 --
 --  A × B ≅ ∀ X. (A → B → X) → X
 --  A + B ≅ ∀ X. (A → X) → (B → X) → X
+
+module Prod
+  (X : Set)
+  (A : Ty [] lzero)
+  (B : Ty [] lzero)
+
+  (let ¬¬AB : Ty (lzero ∷ []) lzero
+       ¬¬AB = (Wk A ⇒ Wk B ⇒ var) ⇒ var)
+
+  (let A' : Ty [] l1
+       A' = ∀̇ ¬¬AB)
+
+  (let tA' = Tm [] A')
+  (t : tA')
+  where
+
+  A×B : Ty [] _
+  A×B = A ×' B
+
+  tA×B = Tm [] A×B
+
+  s : ((Wk A ⇒ Wk B ⇒ var) ⇒ var) [ sgS A×B ] →s (A ⇒ B ⇒ A×B) ⇒ A×B
+  s = step arrS (arr (step arrS (arr (step compS (step idS (step idS refl)))
+    (step arrS (arr (step compS (step idS (step idS refl))) (step prjS refl)))))
+    (step prjS refl))
+
+  t₀ : tA×B
+  t₀ = app (conv s (inst t A×B)) (abs (abs (prod (wk (var here)) (var here))))
+
+  t' : tA'
+  t' = gen (abs (app (app (var here) (wk (wkTy (proj1 t₀)))) ((wk (wkTy (proj2 t₀))))))
+
+  ⟦A×B⟧ = ⟦ A×B ⟧ _
+  ⦅t⦆ = ⦅ t ⦆ _ _
+  ⦅t'⦆ = ⦅ t' ⦆ _ _
+
+
+  thm : ⟦ A' ⟧R _ ⦅t'⦆ ⦅t⦆
+  thm {S} {S'} R {k} {k'} ⟦k⟧ = ⦅ t ⦆R _ _ R' ⟦k⟧
+    where
+    R' : REL ⟦A×B⟧ S' lzero
+    R' (a , b) = R (k a b)
 
 -- Parametricity for bounded polymorphism:
 --
